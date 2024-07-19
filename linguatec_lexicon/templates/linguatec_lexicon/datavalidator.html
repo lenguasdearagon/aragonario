@@ -10,42 +10,45 @@
 {% block content %}
 <h1>{{ title }}</h1>
 <div class="row">
-    <div class="col-12">
-        <div>
-            Selecciona el fichero XLSX para validar.
-        </div>
-        <div class="data-validator-form">
-            <form action="" enctype="multipart/form-data" method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <input id="validate" type="submit" value="validate" />
-            </form>
-        </div>
+  <div class="col-12">
+    <div>
+      Selecciona el fichero XLSX para validar.
     </div>
+    <div class="data-validator-form">
+      <form action="" enctype="multipart/form-data" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input id="validate" type="submit" value="validate" />
+      </form>
+    </div>
+  </div>
 </div>
+
+{% if errors %}
 <div class="row">
-    <div class="col-12">
-        <h3>Errors for <strong>{{ input_file }}</strong></h3>
-        <p>Found {{ errors|length }} errors.</p>
-        <table class="table table-hover table-striped">
-            <caption>Errors found in the validated file</caption>
-            <thead>
-                <th>#</th>
-                <th>word</th>
-                <th>column</th>
-                <th>error</th>
-            </thead>
-            <tbody>
-                {% for e in errors %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ e.word }}</td>
-                    <td>{{ e.column }}</td>
-                    <td>{{ e.message }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+  <div class="col-12">
+    <h3>Errors for <strong>{{ input_file }}</strong></h3>
+    <p>Found {{ errors|length }} errors.</p>
+    <table class="table table-hover table-striped">
+      <caption>Errors found in the validated file</caption>
+      <thead>
+        <th>#</th>
+        <th>word</th>
+        <th>column</th>
+        <th>error</th>
+      </thead>
+      <tbody>
+        {% for e in errors %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ e.word }}</td>
+          <td>{{ e.column }}</td>
+          <td>{{ e.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
+{% endif %}
 {% endblock %}

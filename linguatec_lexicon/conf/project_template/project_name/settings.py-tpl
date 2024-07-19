@@ -37,13 +37,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # linguatec-lexicon apps
     'linguatec_lexicon',
-    
+
     # Third-party apps
     'django_extensions',
     'rest_framework',
+    'django_q',
 ]
 
 MIDDLEWARE = [
@@ -125,3 +126,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/{{ docs_version }}/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+# django-q2 ORM broker connection
+Q_CLUSTER = {
+    "name": "aragonario",
+    "timeout": 120,
+    "retry": 180,
+    "bulk": 5,
+    "orm": "default",
+}

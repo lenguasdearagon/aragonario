@@ -4,17 +4,24 @@ import tempfile
 from io import StringIO
 
 from django.core.management import call_command
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.views.generic.base import TemplateView
+from django.views.generic.edit import FormView
+from django_q.tasks import async_task, result
 from rest_framework import generics, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
+from linguatec_lexicon import tasks
+
 from .forms import ValidatorForm
-from .models import GramaticalCategory, Word, Lexicon
-from .serializers import GramaticalCategorySerializer, WordSerializer, WordNearSerializer, LexiconSerializer
+from .models import GramaticalCategory, Lexicon, Word
+from .serializers import (GramaticalCategorySerializer, LexiconSerializer,
+                          WordNearSerializer, WordSerializer)
 from .validators import validate_lexicon_slug
 
 
@@ -77,6 +84,85 @@ class DiatopicVariationValidatorView(DataValidatorView):
         out = StringIO()
         call_command('importvariation', xlsx_file, dry_run=True, no_color=True, verbosity=3, stdout=out)
         return out
+
+
+class MonoValidatorView(FormView):
+    title = "Monolingual validator"
+    lexicon = 'an-an'
+    form_class = ValidatorForm
+    template_name = "linguatec_lexicon/datavalidator.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'title': self.title,
+        })
+        return context
+
+    def form_valid(self, form):
+        xlsx_file = form.cleaned_data['input_file']
+
+        # store uploaded file as a temporal file
+        tmp_fd, tmp_file = tempfile.mkstemp(suffix='.xlsx')
+        with open(tmp_file, 'wb') as f:
+            f.write(xlsx_file.read())
+
+        # run the validation async
+
+        task_id = async_task(tasks.validate_mono, self.lexicon, tmp_file)
+
+        self.task_id = task_id
+
+        return super().form_valid(form)
+
+    def get_success_url(self) -> str:
+        return reverse("task-detail", kwargs={"task_id": self.task_id})
+
+
+class TaskDetailView(TemplateView):
+    template_name = "linguatec_lexicon/task-detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        task_id = kwargs.get('task_id')
+        task_result = result(task_id)
+        data = []
+
+        # NOTE: when the task has not yet be run, r is None
+        # NOTE: we don't have way to differentiate between a task that has not been run and non existing task
+        if task_result is not None:
+            content = task_result.getvalue()
+            for line in content.split('\n'):
+                if line == '':
+                    continue
+
+                line = json.loads(line)
+                data.append(line)
+
+        data = self.paginate_queryset(data)
+
+        context.update({
+            'task_id': task_id,
+            'task_result': data,
+            'task_finished': task_result is not None,
+        })
+
+        return context
+
+    def paginate_queryset(self, data):
+        page_size = 50
+        page = self.request.GET.get('page', 1)
+        paginator = Paginator(data, page_size)
+
+        try:
+            data = paginator.page(page)
+        except PageNotAnInteger:
+            data = paginator.page(1)
+        except EmptyPage:
+            data = paginator.page(paginator.num_pages)
+
+        return data
 
 
 class DefaultLimitOffsetPagination(LimitOffsetPagination):

@@ -1,0 +1,111 @@
+{% extends 'rest_framework/base.html' %}
+{% load i18n static %}
+
+{% block title %}Task {{ task_id }}{% endblock %}
+
+
+{% block style %}
+{{ block.super }}
+<style>
+  .loader {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #a30000;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+  }
+
+  @keyframes rotation {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+</style>
+
+{% endblock %}
+
+
+
+{% block content %}
+<h1>Task {{ task_id }}</h1>
+
+{% if task_finished %}
+<div class="row">
+  <div class="col-12">
+    <h3>Task result</h3>
+
+    <table class="table table-hover table-striped">
+      <caption>Errors found in the validated file</caption>
+      <thead>
+        <th>#</th>
+        <th>word</th>
+        <th>column</th>
+        <th>error</th>
+      </thead>
+      <tbody>
+        {% for e in task_result.object_list %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ e.word }}</td>
+          <td>{{ e.column }}</td>
+          <td>{{ e.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!--Pagination-->
+    <nav aria-label="result-paginator">
+      <ul class="pager">
+        {% if task_result.has_previous %}
+        <li class="previous"><a href="?page={{ task_result.previous_page_number }}">
+            {% else %}
+        <li class="previous disabled"><a href="#">
+            {% endif %}
+            <span aria-hidden="true">&larr;</span> Previous</a>
+        </li>
+
+        <li class="current">
+          <span>Page {{ task_result.number }} of {{ task_result.paginator.num_pages }}</span>
+        </li>
+
+        {% if task_result.has_next %}
+        <li class="next"><a href="?page={{ task_result.next_page_number }}">
+            {% else %}
+        <li class="next disabled"><a href="#">
+            {% endif %}
+            Next <span aria-hidden="true">&rarr;</span></a>
+        </li>
+
+      </ul>
+    </nav>
+  </div>
+  <!--end of Pagination-->
+
+</div>
+</div>
+{% else %}
+<p>Task is still running...</p>
+<span class="loader"></span>
+{% endif %}
+{% endblock %}
+
+
+{% block script %}
+{{ block.super }}
+{% if not task_finished %}
+<script type="text/javascript">
+  function reloadPage() {
+    location.reload();
+  }
+  setTimeout(reloadPage, 5000);
+</script>
+{% endif %}
+{% endblock %}

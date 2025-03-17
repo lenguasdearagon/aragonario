@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .models import (DiatopicVariation, Entry, Example, GramaticalCategory,
-                     VerbalConjugation, Word, Lexicon)
+                     Lexicon, VerbalConjugation, Word)
 
 
 class ExampleSerializer(serializers.ModelSerializer):
@@ -51,7 +51,7 @@ class WordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Word
-        fields = ('id', 'slug', 'url', 'lexicon', 'term', 'gramcats', 'entries', 'admin_panel_url')
+        fields = ('id', 'slug', 'url', 'lexicon', 'term', 'etimol', 'gramcats', 'entries', 'admin_panel_url')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

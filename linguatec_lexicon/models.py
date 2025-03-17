@@ -120,9 +120,9 @@ class WordManager(models.Manager):
 
         # sort results by trigram similarity
         qs = qs.filter(
-                term__iregex=iregex.format(query)
-            ).annotate(similarity=TrigramSimilarity('term', query)
-                       ).filter(similarity__gt=MIN_SIMILARITY).order_by('-similarity')
+            term__iregex=iregex.format(query)
+        ).annotate(similarity=TrigramSimilarity('term', query)
+                   ).filter(similarity__gt=MIN_SIMILARITY).order_by('-similarity')
         return qs
 
     def search_near(self, query, lex=None):
@@ -161,6 +161,7 @@ class Word(models.Model):
     lexicon = models.ForeignKey('Lexicon', on_delete=models.CASCADE, related_name="words")
     term = models.CharField(max_length=64)
     slug = models.SlugField()
+    etimol = models.CharField(max_length=255, blank=True)
 
     class Meta:
         constraints = [

@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 
 from django.core.management import BaseCommand, CommandError
 from django.db import transaction
@@ -26,20 +27,21 @@ class Command(BaseCommand):
             help="Select the lexicon where data will be imported",
         )
         parser.add_argument('input_file', type=str)
+        parser.add_argument('--truncate', action='store_true', help="Truncate the table before importing")
+        parser.add_argument('--etimol-rich-text', action='store_true',
+                            help="Import rich text from ODS file (WARNING: VERY EXPENSIVE operation)")
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.input_file = options['input_file']
-        self.lexicon_code = options['lexicon_code']
-
+        self.set_options(**options)
         # check that a lexicon with that code exist
         try:
             self.lexicon = Lexicon.objects.get_by_slug(self.lexicon_code)
         except Lexicon.DoesNotExist:
             raise CommandError('Error: There is not a lexicon with that code: ' + self.lexicon_code)
 
-        # self.xlsx = pd.read_excel(self.input_file, sheet_name=None, header=None, usecols="A:E",
-        #                           names=["term", "url", "etimol", "def", "def2"])
+        if self.truncate:
+            Word.objects.filter(lexicon=self.lexicon).delete()
 
         self._words = set()
 
@@ -49,6 +51,7 @@ class Command(BaseCommand):
 
         self.xlsx = load_workbook(self.input_file, read_only=True)
         self.ods = self.xlsx2ods()
+        self.ods_table = self.ods.getElementsByType(Table)[0]
         sheet = self.xlsx.active
 
         errors = []
@@ -93,31 +96,43 @@ class Command(BaseCommand):
             self.lexicon.delete()
             self.lexicon = self._lexicon
 
+    def set_options(self, **options):
+        self.input_file = options['input_file']
+        self.lexicon_code = options['lexicon_code']
+        self.truncate = options['truncate']
+        self.etimol_rich_text = options['etimol_rich_text']
+
     def xlsx2ods(self):
-        # TODO(@slamora): create code to convert xlsx to ods
+        # Convert xlsx to ods (required to be able to extract rich text)
         odspath = self.input_file.replace(".xlsx", ".ods")
-        if not os.path.exists(odspath):
-            raise CommandError(f"ODS file doesn't exist: {odspath}")
+
+        # optimization: avoid converting the file if it already exists
+        if os.path.exists(odspath):
+            self.stdout.write(f"ODS file already exists: {odspath}")
+
+        else:
+            try:
+                subprocess.run(
+                    ["libreoffice", "--headless", "--convert-to", "ods",
+                        self.input_file, "--outdir", os.path.dirname(odspath)],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                self.stdout.write(f"Conversion successful: {odspath}")
+            except subprocess.CalledProcessError as e:
+                self.stderr.write("Error during conversion:", e.stderr.decode())
+
         return opendocument.load(odspath)
 
     def validate_row(self, row, row_number):
         instance = Row(row, row_number, self._words)
         instance.is_valid()
 
-        instance.etimol = self.extract_etimol_rich_text(row_number)
+        if self.etimol_rich_text:
+            instance.etimol = instance.extract_etimol_rich_text(self.ods_table, row_number)
 
         return instance
-
-    def extract_etimol_rich_text(self, row_number):
-        # retrieve etimol XML from ODS
-        doc = self.ods
-        table = doc.getElementsByType(Table)[0]
-        row = table.getElementsByType(TableRow)[row_number - 1]  # 0-indexed
-        cell = row.getElementsByType(TableCell)[2]
-
-        etimol_html = extract_text_as_html(cell)
-
-        return etimol_html
 
     def print_errors(self, errors, format="json"):
         for error in errors:
@@ -173,15 +188,19 @@ class Row:
         if self.term in self.existing_words:
             self.errors["term"] = "This term already exists"
             return False
-
         # TODO(@slamora): check if the term is in the database???? or all the imports are from scratch???
         # allow user to decide if the import is from scratch or not
-        # TODO(@slamora): optimize storing on memmory to perform only one query
-        # if Word.objects.filter(lexicon=XXX, term=self.term).exists():
-        #     self.errors["term"] = "This term already exists"
 
         self.existing_words.add(self.term)
         return True
+
+    def extract_etimol_rich_text(self, ods_table, row_number):
+        # retrieve etimol XML from ODS
+        row = ods_table.getElementsByType(TableRow)[row_number - 1]  # 0-indexed
+        cell = row.getElementsByType(TableCell)[2]
+
+        etimol_html = extract_text_as_html(cell)
+        return etimol_html
 
 
 def extract_text_as_html(cell):

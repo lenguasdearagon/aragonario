@@ -3,6 +3,7 @@ import os
 import tempfile
 from io import StringIO
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.management import call_command
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import Http404
@@ -25,7 +26,7 @@ from .serializers import (GramaticalCategorySerializer, LexiconSerializer,
 from .validators import validate_lexicon_slug
 
 
-class DataValidatorView(TemplateView):
+class DataValidatorView(LoginRequiredMixin, TemplateView):
     template_name = "linguatec_lexicon/datavalidator.html"
     title = "Data validator"
 
@@ -86,7 +87,7 @@ class DiatopicVariationValidatorView(DataValidatorView):
         return out
 
 
-class MonoValidatorView(FormView):
+class MonoValidatorView(LoginRequiredMixin, FormView):
     title = "Monolingual validator"
     lexicon = 'an-an'
     form_class = ValidatorForm
@@ -119,7 +120,7 @@ class MonoValidatorView(FormView):
         return reverse("task-detail", kwargs={"task_id": self.task_id})
 
 
-class TaskDetailView(TemplateView):
+class TaskDetailView(LoginRequiredMixin, TemplateView):
     template_name = "linguatec_lexicon/task-detail.html"
 
     def get_context_data(self, **kwargs):

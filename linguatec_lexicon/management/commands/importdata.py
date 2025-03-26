@@ -1,4 +1,5 @@
 import json
+import pprint
 import sys
 
 import pandas as pd
@@ -115,8 +116,17 @@ class Command(BaseCommand):
         if self.errors:
             self.stdout.write(self.style.ERROR(f"Detected {len(self.errors)} errors!"))
             if self.verbosity >= 2:
+                error_messages_by_type = {}
                 for error in self.errors:
-                    self.stdout.write(self.style.ERROR(json.dumps(error)))
+                    message = error["message"]
+                    word = error["word"]
+
+                    if message not in error_messages_by_type:
+                        error_messages_by_type[message] = []
+                    error_messages_by_type[message].append(word)
+
+                formatted_output = pprint.pformat(error_messages_by_type, indent=2, width=100)
+                self.stdout.write(formatted_output)
 
         elif not self.dry_run:
             # Write data into the database
